@@ -1,0 +1,207 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  ALUMNI
+  FACULTY
+  ADMIN
+}
+
+enum MentorshipStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PostType {
+  JOB
+  ACADEMIC
+  ANNOUNCEMENT
+  QUERY
+}
+
+enum EventOrganizerType {
+  CLUB
+  DEPARTMENT
+  FACULTY
+  ADMIN
+}
+
+enum ChatRoomKind {
+  MENTORSHIP
+  DIRECT
+  GROUP
+}
+
+model User {
+  id                     String                 @id @default(cuid())
+  email                  String                 @unique
+  username               String                 @unique
+  password               String
+  name                   String
+  role                   Role
+  department             String?
+  batch                  Int?
+  year                   Int?
+  company                String?
+  domain                 String?
+  skills                 String                 @default("")
+  bio                    String?
+  age                    Int?
+  gender                 String?
+  education              String?
+  location               String?
+  currentPosition        String?
+  experience             String?
+  socialLinks            String                 @default("")
+  profilePicture         String?
+  isVerifiedAlumni       Boolean                @default(false)
+  mentorshipAvailable    Boolean                @default(false)
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+  posts                  Post[]
+  comments               Comment[]
+  likes                  PostLike[]
+  mentorRequests         MentorshipRequest[]    @relation("MentorRequests")
+  studentRequests        MentorshipRequest[]    @relation("StudentRequests")
+  mentorChats            ChatRoom[]             @relation("MentorRoom")
+  studentChats           ChatRoom[]             @relation("StudentRoom")
+  createdChatRooms       ChatRoom[]             @relation("ChatRoomCreator")
+  chatMemberships        ChatRoomMember[]
+  messages               Message[]
+  eventRegistrations     EventRegistration[]
+  createdEvents          Event[]                @relation("EventCreator")
+}
+
+model MentorshipRequest {
+  id         String           @id @default(cuid())
+  studentId  String
+  mentorId   String
+  message    String?
+  status     MentorshipStatus @default(PENDING)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  student    User             @relation("StudentRequests", fields: [studentId], references: [id], onDelete: Cascade)
+  mentor     User             @relation("MentorRequests", fields: [mentorId], references: [id], onDelete: Cascade)
+  chatRoom   ChatRoom?
+}
+
+model ChatRoom {
+  id                  String             @id @default(cuid())
+  kind                ChatRoomKind       @default(MENTORSHIP)
+  name                String?
+  studentId           String?
+  mentorId            String?
+  mentorshipRequestId String?            @unique
+  createdById         String?
+  createdAt           DateTime           @default(now())
+  mentor              User?              @relation("MentorRoom", fields: [mentorId], references: [id], onDelete: Cascade)
+  student             User?              @relation("StudentRoom", fields: [studentId], references: [id], onDelete: Cascade)
+  createdBy           User?              @relation("ChatRoomCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  mentorshipRequest   MentorshipRequest? @relation(fields: [mentorshipRequestId], references: [id], onDelete: SetNull)
+  members             ChatRoomMember[]
+  messages            Message[]
+}
+
+model ChatRoomMember {
+  id        String   @id @default(cuid())
+  roomId    String
+  userId    String
+  joinedAt  DateTime @default(now())
+  room      ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  roomId    String
+  senderId  String
+  content   String
+  createdAt DateTime @default(now())
+  room      ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+}
+
+model Post {
+  id        String     @id @default(cuid())
+  authorId  String
+  type      PostType
+  title     String
+  content   String
+  imageUrl  String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  author    User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  comments  Comment[]
+  likes     PostLike[]
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  postId    String
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+}
+
+model PostLike {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+}
+
+model Event {
+  id              String              @id @default(cuid())
+  title           String
+  description     String
+  organizerType   EventOrganizerType
+  organizerName   String
+  eventDate       DateTime
+  location        String
+  imageUrl        String?
+  createdById     String
+  qrAttendanceOn  Boolean             @default(false)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  createdBy       User                @relation("EventCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  registrations   EventRegistration[]
+}
+
+model EventRegistration {
+  id          String   @id @default(cuid())
+  eventId      String
+  studentId    String
+  registeredAt DateTime @default(now())
+  attended     Boolean  @default(false)
+  event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  student      User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, studentId])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorId     String
+  actorEmail  String
+  action      String
+  targetUserId String?
+  targetRole  Role?
+  metadata    String?
+  createdAt   DateTime @default(now())
+}

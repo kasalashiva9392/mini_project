@@ -1,0 +1,17 @@
+{
+  "name": "mini_project",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "backend:dev": "cd backend && npm run dev",
+    "frontend:dev": "cd frontend && npm run dev",
+    "backend:seed": "cd backend && npm run seed",
+    "backend:db": "cd backend && npx prisma db push && npx prisma generate",
+    "backend:reset:seed": "cd backend && npm run db:reset:seed",
+    "backend:smoke": "cd backend && npm run test:smoke"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "Unified College Connect monorepo"
+}

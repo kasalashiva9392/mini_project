@@ -1,0 +1,54 @@
+services:
+  backend:
+    build: ./backend
+    container_name: ucc-backend
+    ports:
+      - "5000:5000"
+    # Ollama on your Mac/Windows host is NOT at 127.0.0.1 from inside the container.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file:
+      - ./backend/.env
+    environment:
+      - PORT=5000
+      - CLIENT_URL=http://localhost:5173
+      - JWT_SECRET=change-me-super-secret
+      - JWT_EXPIRES_IN=7d
+      - DATABASE_URL=file:./dev.db
+      # Overrides backend/.env — use host gateway so the container reaches Ollama on the host
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_SECURE=${SMTP_SECURE}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - SMTP_FROM=${SMTP_FROM}
+      - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
+      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
+      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
+    volumes:
+      - ./backend/prisma:/app/prisma
+      - ./backend/src:/app/src
+      - ./backend/scripts:/app/scripts
+    command: sh -c "npx prisma db push && npm run start"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  frontend:
+    build: ./frontend
+    container_name: ucc-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

@@ -1,0 +1,80 @@
+# Production-style stack: PostgreSQL + API + static frontend.
+# Copy env: cp backend/.env.production.example .env.prod && edit, then:
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up --build
+#
+# Required in .env.prod: CLIENT_URL, JWT_SECRET, POSTGRES_PASSWORD, VITE_API_URL (public API URL).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ucc-postgres
+    environment:
+      POSTGRES_USER: ucc
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: ucc
+    volumes:
+      - ucc_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ucc -d ucc"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        PRISMA_SCHEMA: prisma/schema.postgres.prisma
+    container_name: ucc-backend-prod
+    ports:
+      - "${BACKEND_PORT:-5000}:5000"
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      DATABASE_URL: postgresql://ucc:${POSTGRES_PASSWORD}@postgres:5432/ucc?schema=public
+      CLIENT_URL: ${CLIENT_URL:?Set CLIENT_URL to your frontend origin(s), comma-separated}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "npx prisma generate --schema prisma/schema.postgres.prisma &&
+             npx prisma db push --schema prisma/schema.postgres.prisma &&
+             node src/server.js"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:?Set VITE_API_URL to the browser-reachable API base URL}
+    container_name: ucc-frontend-prod
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  ucc_pgdata:
