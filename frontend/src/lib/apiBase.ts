@@ -26,5 +26,8 @@ export function apiUnreachableUserMessage(): string {
   if (isBrowserOnDeployedHost() && apiBaseLooksLocal(base)) {
     return `Cannot reach API — the bundle still points to ${base}. On Render (static site): Environment → set VITE_API_URL to your public API URL (e.g. https://your-api.onrender.com), then Clear build cache & redeploy.`;
   }
+  if (isBrowserOnDeployedHost() && !apiBaseLooksLocal(base)) {
+    return `Cannot reach API at ${base}. If /health opens OK, this is often CORS: on your Render API service set CLIENT_URL to this page’s origin (${typeof window !== "undefined" ? window.location.origin : "your frontend URL"}) and redeploy the API. See the browser console for CORS errors.`;
+  }
   return `Cannot reach API at ${base}. If you are deployed, set VITE_API_URL at build time. Otherwise start the API and check the Network tab.`;
 }
