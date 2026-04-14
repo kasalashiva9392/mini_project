@@ -1,3 +1,4 @@
+require("dotenv").config({ path: require("path").join(__dirname, "..", ".env"), override: true });
 const { execSync } = require("child_process");
 
 const run = (command) => {
@@ -13,7 +14,9 @@ try {
   // Uses PostgreSQL-specific schema without touching local SQLite schema.
   run("npx prisma generate --schema prisma/schema.postgres.prisma");
   // No migration history in repo yet — sync schema (use `migrate dev` locally when you add migrations).
-  run("npx prisma db push --schema prisma/schema.postgres.prisma");
+  const acceptLoss =
+    process.env.PRISMA_ACCEPT_DATA_LOSS === "1" ? " --accept-data-loss" : "";
+  run(`npx prisma db push --schema prisma/schema.postgres.prisma${acceptLoss}`);
 
   console.log("\nPostgreSQL production setup complete.");
 } catch (error) {

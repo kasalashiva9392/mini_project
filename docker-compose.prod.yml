@@ -1,8 +1,9 @@
 # Production-style stack: PostgreSQL + API + static frontend.
-# Copy env: cp backend/.env.production.example .env.prod && edit, then:
+# Copy env: cp .env.prod.example .env.prod && edit secrets/URLs, then:
 #   docker compose -f docker-compose.prod.yml --env-file .env.prod up --build
 #
-# Required in .env.prod: CLIENT_URL, JWT_SECRET, POSTGRES_PASSWORD, VITE_API_URL (public API URL).
+# Creates DB "ucc" (user ucc). Required in .env.prod: CLIENT_URL, JWT_SECRET,
+# POSTGRES_PASSWORD, VITE_API_URL (browser-reachable API base URL).
 
 services:
   postgres:

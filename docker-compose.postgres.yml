@@ -1,0 +1,24 @@
+# Local PostgreSQL for development (same DB name/user pattern as docker-compose.prod.yml).
+# Start: docker compose -f docker-compose.postgres.yml up -d
+# Then from backend/: npm run db:postgres:generate && npm run db:postgres:push
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ucc-postgres-dev
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ucc
+      POSTGRES_PASSWORD: ucc_local_dev
+      POSTGRES_DB: ucc
+    volumes:
+      - ucc_pgdata_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ucc -d ucc"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  ucc_pgdata_dev:

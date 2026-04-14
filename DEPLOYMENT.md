@@ -2,6 +2,16 @@
 
 This app is **production-ready** when you configure environment variables and (for uploads/email/AI) external services.
 
+## Deployment checklist (do these in order)
+
+1. **PostgreSQL** — Create a database (Neon, RDS, Docker on a VPS, etc.) and obtain a **`DATABASE_URL`** with `?schema=public` (and `sslmode=require` for managed hosts).
+2. **Apply schema** — From `backend/` with `DATABASE_URL` set: `node scripts/setup-postgres-prod.js` (or `npm run db:postgres:setup-prod`). If Neon’s sample table blocks the push, run once with `PRISMA_ACCEPT_DATA_LOSS=1` (see **Database: PostgreSQL (Neon or other managed)** below).
+3. **Backend secrets** — On the API host, set **`NODE_ENV=production`**, **`JWT_SECRET`**, **`CLIENT_URL`** (exact frontend origins), and **`DATABASE_URL`**. Optional: Cloudinary, SMTP, OpenAI/Ollama.
+4. **Deploy the API** — Start with `node src/server.js` (or your Docker image). Confirm **`GET /health`** on the public API URL.
+5. **Frontend build** — Build with **`VITE_API_URL`** equal to that **public API base URL** (no trailing slash), e.g. `VITE_API_URL=https://api.yourapp.com npm run build` in `frontend/`.
+6. **Deploy static files** — Serve `frontend/dist` behind HTTPS (Vercel, Netlify, S3+CloudFront, nginx, etc.).
+7. **Smoke-test** — Log in, open chat; real-time features need **WebSocket** support to the API (see [Socket.IO](#socketio-and-reverse-proxies)).
+
 ## What is “real” vs optional
 
 | Feature | Required for production | Configure |
@@ -61,19 +71,59 @@ Docker: the `frontend/Dockerfile` accepts `ARG VITE_API_URL` (see `docker-compos
 
 **Production:** the API server must reach Ollama over HTTP; do not expose Ollama to the public internet without authentication — keep it on a private network or localhost behind your API.
 
-## Database: PostgreSQL (recommended for production)
+## Database: PostgreSQL (Neon or other managed)
 
-1. Copy `backend/.env.production.example` and set `DATABASE_URL` to your Postgres URL.
-2. From `backend/`:
+1. In Neon (or your provider), create a project and copy the **connection string**. Ensure Prisma can connect:
+   - Append **`&schema=public`** if it is not already in the URL (Prisma expects the `public` schema).
+   - Keep **`sslmode=require`** (Neon default).
+
+2. Copy `backend/.env.production.example` to a **private** env file or paste variables into your host’s dashboard. Set **`DATABASE_URL`** to that string (never commit real URLs to git).
+
+3. From `backend/` (or in CI with secrets):
 
 ```bash
 npm run db:postgres:generate
 npm run db:postgres:setup-prod
 ```
 
-`setup-postgres-prod` runs `prisma db push` against `schema.postgres.prisma` (migrations can be added later with `prisma migrate dev`).
+`setup-postgres-prod` loads `backend/.env` with override so it wins over a stray shell `DATABASE_URL`; on the server, set env vars in the platform UI instead.
 
-3. Seed or create users as needed (`npm run seed` only matches your **SQLite** dev flow; for Postgres use a script or admin UI).
+If `db push` warns about dropping Neon’s sample **`playing_with_neon`** table, run **once**:
+
+```bash
+PRISMA_ACCEPT_DATA_LOSS=1 node scripts/setup-postgres-prod.js
+```
+
+4. **Seeding** — `npm run seed` is wired for the default **SQLite** dev schema path. For production Postgres, create users via registration or a one-off script; do not point production at a dev-only seed without reviewing it.
+
+5. **Ongoing deploys** — After schema changes, run `db push` or migrations against production `DATABASE_URL` before or as part of release (see your host’s “release command” / CI).
+
+## Database: PostgreSQL via Docker Compose (own VPS)
+
+If you use **`docker-compose.prod.yml`** instead of Neon, Postgres is created by Compose; set **`POSTGRES_PASSWORD`** in `.env.prod`. You do **not** set `DATABASE_URL` in `.env.prod` for that file—the backend service injects it. See [Docker](#docker-production-compose) below.
+
+## Split hosting (Neon + API + static site)
+
+Typical layout:
+
+| Piece | Where | What to configure |
+|-------|--------|-------------------|
+| DB | Neon | Connection string → **`DATABASE_URL`** on API only |
+| API | Railway, Render, Fly.io, VPS, etc. | **`NODE_ENV`**, **`PORT`**, **`JWT_SECRET`**, **`CLIENT_URL`**, **`DATABASE_URL`**, start: `node src/server.js` |
+| Frontend | Vercel, Netlify, nginx | Build arg **`VITE_API_URL`** = public API URL |
+
+**Build frontend for production:**
+
+```bash
+cd frontend
+VITE_API_URL=https://api.yourdomain.com npm run build
+```
+
+The API process must be reachable at exactly that origin for REST and Socket.IO.
+
+## Socket.IO and reverse proxies
+
+Chat uses **Socket.IO** (WebSockets with HTTP fallback). Your API host and any reverse proxy must allow **WebSocket upgrades** to the same public URL as `VITE_API_URL`. If chat fails only in production, check the platform’s WebSocket docs and that **`CLIENT_URL`** lists every frontend origin (including `www` and preview URLs if used).
 
 ## Docker (production compose)
 
@@ -95,6 +145,31 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod up --build
 Frontend mapped to **`${FRONTEND_PORT:-8080}`**, backend to **`${BACKEND_PORT:-5000}`**.
 
 The production backend image builds Prisma with **`prisma/schema.postgres.prisma`**. Local/dev `docker compose` without the prod file still uses SQLite as before.
+
+## Render.com (Blueprint)
+
+The repo includes **`render.yaml`** with two services:
+
+| Service | Purpose |
+|--------|---------|
+| **`ucc-api`** | Node API (`backend/`) — build runs Prisma generate + `db push` against **`DATABASE_URL`**. |
+| **`ucc-web`** | Static SPA (`frontend/`) — **`VITE_API_URL`** must be set at **build** time. |
+
+**Setup**
+
+1. Push the repo to GitHub/GitLab/Bitbucket and open [Render](https://render.com) → **New** → **Blueprint** → connect the repo and select `render.yaml`.
+2. When prompted, set **secret env vars**:
+   - **API:** `DATABASE_URL` (Neon), `JWT_SECRET`, `CLIENT_URL` (comma-separated HTTPS origins of the **static site**, e.g. `https://ucc-web.onrender.com`).
+   - Optional: Cloudinary, SMTP, OpenAI, etc.
+3. Deploy **only the API** first (or deploy both, then fix the web service in step 5). Copy the API’s public URL (e.g. `https://ucc-api.onrender.com`).
+4. In the **static site** service, set **`VITE_API_URL`** to that API URL (no trailing slash). **Clear build cache** and **redeploy** the static site so Vite embeds the correct API origin.
+5. Update **`CLIENT_URL`** on the API if your frontend URL changed, and redeploy the API if needed.
+
+**Notes**
+
+- **Free** web services **spin down** after idle time; the first request can take ~1 minute, and **Socket.IO** connections drop until the service is awake—expected on the free tier.
+- Neon must allow connections from Render (Neon’s default network settings usually work; if you use IP allowlists, add Render’s [outbound IPs](https://render.com/docs/outbound-ip-addresses) or allow the right ranges).
+- Service names (`ucc-api`, `ucc-web`) must be unique in your Render account—rename them in `render.yaml` if there is a conflict.
 
 ## TLS and reverse proxy
 

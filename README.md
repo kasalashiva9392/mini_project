@@ -142,7 +142,7 @@ docker compose up --build
 - Frontend: `http://localhost:5173` (or port mapped in compose)
 - Backend: `http://localhost:5000`
 
-**Production (PostgreSQL + strict env):** see **[DEPLOYMENT.md](./DEPLOYMENT.md)** and `docker-compose.prod.yml`.
+**Production (PostgreSQL + strict env):** see **[DEPLOYMENT.md](./DEPLOYMENT.md)**, `docker-compose.prod.yml`, or **[Render](./render.yaml)** (`render.yaml` Blueprint).
 
 ## Main Frontend Routes
 - `/login`
