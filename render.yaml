@@ -1,5 +1,9 @@
 # Render Blueprint — https://render.com/docs/infrastructure-as-code
-# Connect this repo in the Render dashboard → New Blueprint → select this file.
+# Recommended stack with Neon: connect repo → New Blueprint → this file (see README "Recommended production path").
+#
+# Free instances spin down when idle; they do not support SSH, scaling, one-off jobs, or
+# persistent disks — use Neon for data. Upgrade ucc-api to a paid instance in the dashboard
+# when you need always-on Socket.IO or SSH; static site can stay on the free tier.
 #
 # Before first deploy: create secrets in the dashboard (or set sync: false vars when prompted):
 #   API: DATABASE_URL (Neon), JWT_SECRET, CLIENT_URL (your static site URL(s), comma-separated)

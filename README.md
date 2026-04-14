@@ -144,6 +144,17 @@ docker compose up --build
 
 **Production (PostgreSQL + strict env):** see **[DEPLOYMENT.md](./DEPLOYMENT.md)**, `docker-compose.prod.yml`, or **[Render](./render.yaml)** (`render.yaml` Blueprint).
 
+### Recommended production path (default decision)
+
+Use this unless you have a reason to run your own VPS:
+
+1. **Database:** [Neon](https://neon.tech) (free tier). Store `DATABASE_URL` only in Render’s environment (or your host’s secrets), never in git.
+2. **App:** [Render](https://render.com) **Blueprint** with this repo’s **`render.yaml`** — one **Node** service (`ucc-api`) and one **static** site (`ucc-web`), both on the **free** instance type to start.
+3. **Deploy order:** Create the Blueprint → set API secrets (`DATABASE_URL`, `JWT_SECRET`, `CLIENT_URL`) → deploy → copy the API URL → set **`VITE_API_URL`** on the static service → clear build cache and redeploy the static site (details in **[DEPLOYMENT.md](./DEPLOYMENT.md)**).
+4. **Realtime chat:** Free web services **spin down** when idle, so Socket.IO can disconnect until the next request wakes the API. That is acceptable for demos and coursework. When you need chat to stay connected, upgrade **`ucc-api`** to a **paid** instance type in the Render dashboard; keep Neon on free until you outgrow it.
+
+**Alternative:** run everything on a VPS with **`docker-compose.prod.yml`** (you manage the server and Postgres backups yourself).
+
 ## Main Frontend Routes
 - `/login`
 - `/register`

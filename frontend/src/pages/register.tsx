@@ -31,7 +31,14 @@ export function RegisterPage() {
       await api.post("/auth/register", { name, username: u, email: normalizedEmail, password, role });
       navigate("/login");
     } catch (err: any) {
-      setError(err.response?.data?.message || "Registration failed");
+      const msg =
+        err.response?.data?.message ||
+        (err.code === "ERR_NETWORK" || err.message === "Network Error"
+          ? "Cannot reach API — check VITE_API_URL at build time and that the API is running (see browser Network tab)."
+          : null) ||
+        err.message ||
+        "Registration failed";
+      setError(msg);
     }
   };
 

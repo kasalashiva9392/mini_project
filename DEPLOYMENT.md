@@ -167,9 +167,55 @@ The repo includes **`render.yaml`** with two services:
 
 **Notes**
 
-- **Free** web services **spin down** after idle time; the first request can take ~1 minute, and **Socket.IO** connections drop until the service is awake—expected on the free tier.
+- **Free** web services **spin down** after periods of **inactivity** (first request after idle can take ~1 minute). **Socket.IO** chat feels that: connections drop when the instance sleeps until something wakes it.
+- On **free** instance types, Render **does not** provide **SSH** into the service, **horizontal scaling**, **one-off jobs** (e.g. shell/CLI tasks in the dashboard), or **persistent disks**. Your data should live in **Neon** (or another external DB), not on the instance filesystem.
+- To enable SSH, scaling, one-off jobs, or persistent disks, switch the **API** service to any **paid** instance type in the Render dashboard (or change `plan` in `render.yaml` per [Render pricing](https://render.com/pricing)).
 - Neon must allow connections from Render (Neon’s default network settings usually work; if you use IP allowlists, add Render’s [outbound IPs](https://render.com/docs/outbound-ip-addresses) or allow the right ranges).
 - Service names (`ucc-api`, `ucc-web`) must be unique in your Render account—rename them in `render.yaml` if there is a conflict.
+
+### Render: manual setup (dashboard, two services)
+
+Use this if you are **not** using a Blueprint file.
+
+**Prerequisites:** Repo on GitHub (e.g. `kasalashiva9392/mini_project`), [Neon](https://neon.tech) project with a Postgres URL (`DATABASE_URL` must include `schema=public` for Prisma if not already).
+
+#### 1) Web Service — API (`backend`)
+
+1. **New** → **Web Service** → connect the repo → branch `main`.
+2. **Name:** e.g. `mini-project-api`.
+3. **Region:** your choice (e.g. Frankfurt).
+4. **Root Directory:** `backend`
+5. **Runtime:** **Node** (not Docker unless you know you need Docker).
+6. **Build Command:** `npm install && npm run render-build`
+7. **Start Command:** `npm start`
+8. **Instance type:** **Free** (or paid if you want always-on).
+9. **Environment** — add:
+
+   | Key | Value |
+   |-----|--------|
+   | `NODE_ENV` | `production` |
+   | `DATABASE_URL` | Neon connection string |
+   | `JWT_SECRET` | long random string (≥10 chars) |
+   | `CLIENT_URL` | your **frontend** public URL(s), comma-separated, e.g. `https://mini-project-web.onrender.com` (add `https://www...` too if you use www) |
+
+   Optional: `CLOUDINARY_*`, `SMTP_*`, `OPENAI_*` (see [Environment variables](#environment-variables)).
+
+10. **Advanced:** **Health Check Path** = `/health` (not `/healthz`).
+11. **Deploy Web Service.** When it is live, open `https://<your-api>.onrender.com/health` — you should see `{"ok":true}`.
+
+#### 2) Static Site — frontend (`frontend`)
+
+1. **New** → **Static Site** → same repo → branch `main`.
+2. **Root Directory:** `frontend`
+3. **Build Command:** `npm install && npm run build`
+4. **Publish Directory:** `dist`
+5. **Environment** — add **`VITE_API_URL`** = your **API** URL from step 1, e.g. `https://mini-project-api.onrender.com` (no trailing slash).
+6. **Deploy.** If the API URL was wrong on first try, change `VITE_API_URL`, then **Clear build cache & deploy** so the bundle updates.
+
+#### 3) CORS / chat
+
+- After the static URL is final, ensure **`CLIENT_URL`** on the API includes that exact origin (scheme + host). If you change the frontend URL, update `CLIENT_URL` and **redeploy the API**.
+- Free API tier **spins down** when idle; Socket.IO may disconnect until the next request wakes the service.
 
 ## TLS and reverse proxy
 
