@@ -9,3 +9,22 @@ export function getApiBaseUrl(): string {
   }
   return "http://localhost:5000";
 }
+
+function isBrowserOnDeployedHost(): boolean {
+  if (typeof window === "undefined") return false;
+  const h = window.location.hostname;
+  return h !== "localhost" && h !== "127.0.0.1";
+}
+
+function apiBaseLooksLocal(base: string): boolean {
+  return base.includes("localhost") || base.includes("127.0.0.1");
+}
+
+/** Shown when the browser cannot reach the API (wrong baked-in URL or API down). */
+export function apiUnreachableUserMessage(): string {
+  const base = getApiBaseUrl();
+  if (isBrowserOnDeployedHost() && apiBaseLooksLocal(base)) {
+    return `Cannot reach API — the bundle still points to ${base}. On Render (static site): Environment → set VITE_API_URL to your public API URL (e.g. https://your-api.onrender.com), then Clear build cache & redeploy.`;
+  }
+  return `Cannot reach API at ${base}. If you are deployed, set VITE_API_URL at build time. Otherwise start the API and check the Network tab.`;
+}

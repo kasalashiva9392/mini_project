@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { api } from "../api/client";
+import { apiUnreachableUserMessage } from "../lib/apiBase";
 import { Button, Card, Input } from "../components/ui";
 import { useAuthStore } from "../store/auth";
 import { GraduationCap } from "lucide-react";
@@ -19,7 +20,12 @@ export function LoginPage() {
       setAuth(data.token, data.user);
       navigate("/dashboard");
     } catch (err: any) {
-      setError(err.response?.data?.message || "Login failed");
+      const net = err.code === "ERR_NETWORK" || err.message === "Network Error";
+      setError(
+        err.response?.data?.message ||
+          (net ? apiUnreachableUserMessage() : null) ||
+          "Login failed",
+      );
     }
   };
 

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { api } from "../api/client";
+import { apiUnreachableUserMessage } from "../lib/apiBase";
 import { Button, Card, Input } from "../components/ui";
 import { GraduationCap } from "lucide-react";
 
@@ -34,7 +35,7 @@ export function RegisterPage() {
       const msg =
         err.response?.data?.message ||
         (err.code === "ERR_NETWORK" || err.message === "Network Error"
-          ? "Cannot reach API — check VITE_API_URL at build time and that the API is running (see browser Network tab)."
+          ? apiUnreachableUserMessage()
           : null) ||
         err.message ||
         "Registration failed";
